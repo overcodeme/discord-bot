@@ -1,9 +1,8 @@
 import openai
-from utils.file_manager import load_yaml
+from data.settings import OPENAI_KEY
 
 
-settings = load_yaml('data/settings.yaml')
-openai_client = openai.OpenAI(settings['OPENAI_KEY'])
+openai_client = openai.OpenAI(OPENAI_KEY)
 
 async def get_openai_response(system_prompt, prompt=None, replying_message=None):
     response = openai_client.completions.create(
