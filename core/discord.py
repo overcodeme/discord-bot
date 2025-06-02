@@ -1,5 +1,5 @@
 from curl_cffi.requests import AsyncSession
-from .openai import get_openai_response
+from .gpt import get_openai_response
 from utils.requests_headers_utils import calculate_nonce, create_x_super_properties
 from data.settings import ATTEMPTS
 import random
@@ -8,13 +8,15 @@ from utils.logger import logger
 
 
 class DiscordClient:
-    def __init__(self, proxy, settings: dict):
+    def __init__(self, account_idx, proxy, settings: dict):
         self.server_id = settings['server_id']
         self.channel_id = settings['channel_id']
-        self.sleep_duration = settings['sleep_duration']
+        self.delay_between_actions = settings['delay_between_actions']
+        self.delay_between_messages = settings['delay_between_messages']
         self.proxy = proxy
         self.settings = settings
-        self.session = AsyncSession()
+        self.session = AsyncSession(proxy=proxy)
+        self.account_idx = account_idx
         self.headers = {
             'accept': '*/*',
             'accept-language': 'en-GB,en-US;q=0.9,en;q=0.8,ru;q=0.7,zh-TW;q=0.6,zh;q=0.5',
@@ -40,6 +42,25 @@ class DiscordClient:
     async def get_chat_messages(self):
         url = f'https://discord.com/api/v9/channels/{self.channel_id}/messages?limit=50'
 
+        for retry in range(ATTEMPTS):
+            try:
+                response = await self.session.get(
+                    url,
+                    headers=self.headers
+                )
+
+                if response.status_code == 200:
+                    logger.success(self.account_idx, 'Successfully got channel messages')
+                    data = await response.json()
+                    return data
+                else:
+                    raise Exception(response.text)
+
+            except Exception as e:
+                random_sleep = random.randint(self.delay_between_actions[0], self.delay_between_actions[1])
+                logger.error(self.account_idx, f'Error while getting channel messages: {e}. Retrying in {random_sleep} sec...')
+                await asyncio.sleep(random_sleep)
+
 
     async def send_message(self, message):
         for retry in range(ATTEMPTS):
@@ -54,11 +75,24 @@ class DiscordClient:
                     'tts': False
                 }
 
+                response = await self.session.post(
+                    url,
+                    headers=self.headers,
+                    json=data
+                )
+
+                if response.status_code == 200:
+                    logger.success(self.account_idx, f'Message "{message}" sent successfully.')
+                else:
+                    raise Exception(response.text)
+
             except Exception as e:
-                random_sleep = random.randint(self.sleep_duration[0], self.sleep_duration[1])
+                random_sleep = random.randint(self.delay_between_actions[0], self.delay_between_actions[1])
+                logger.error(self.account_idx, f'Error while sending message: {e}. Retrying in {random_sleep} seconds...')
+                await asyncio.sleep(random_sleep)
 
 
-    async def reply_message(self):
+    async def reply_message(self, message):
         pass
 
 
