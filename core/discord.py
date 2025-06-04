@@ -9,10 +9,13 @@ from utils.logger import logger
 
 class DiscordClient:
     def __init__(self, account_idx, proxy, settings: dict):
+        self.system_prompt = settings['system_prompt']
+        self.prompt = settings['prompt']
         self.server_id = settings['server_id']
         self.channel_id = settings['channel_id']
         self.delay_between_actions = settings['delay_between_actions']
         self.delay_between_messages = settings['delay_between_messages']
+        self.reply_chance = settings['reply_chance']
         self.proxy = proxy
         self.settings = settings
         self.session = AsyncSession(proxy=proxy)
@@ -39,7 +42,7 @@ class DiscordClient:
         }
 
 
-    async def get_chat_messages(self):
+    async def get_channel_messages(self):
         url = f'https://discord.com/api/v9/channels/{self.channel_id}/messages?limit=50'
 
         for retry in range(ATTEMPTS):
@@ -60,20 +63,46 @@ class DiscordClient:
                 random_sleep = random.randint(self.delay_between_actions[0], self.delay_between_actions[1])
                 logger.error(self.account_idx, f'Error while getting channel messages: {e}. Retrying in {random_sleep} sec...')
                 await asyncio.sleep(random_sleep)
+                return data
 
 
-    async def send_message(self, message):
+    async def send_message(self):
+        is_reply = (random.random() * 100) >= self.reply_chance
+        message = ''
+        data = {}
+
+        if is_reply:
+            channel_messages = await self.get_channel_messages()
+            random_message = channel_messages[random.randint(0, 49)]
+            prompt, message_id = random_message['content'], random_message['id']
+            message = await get_openai_response(self.account_idx, system_prompt=self.system_prompt, prompt=prompt)
+
+            data = {
+                'content': message,
+                'flags': 0,
+                'message_reference': {
+                    'channel_id': self.channel_id,
+                    'guild_id': self.server_id,
+                    'message_id': message_id
+                },
+                'mobile_network_type': 'unknown',
+                'nonce': calculate_nonce(),
+                'tts': False
+            }
+
+        else:
+            message = await get_openai_response(account_idx=self.account_idx, system_prompt=self.system_prompt, prompt=self.prompt)
+            data = {
+                'content': message,
+                'flags': 0,
+                'mobile_network_type': 'unknown',
+                'nonce': calculate_nonce(),
+                'tts': False
+            }
+
         for retry in range(ATTEMPTS):
             try:
                 url = f'https://discord.com/api/v9/channels/{self.channel_id}/messages'
-
-                data = {
-                    'content': message, 
-                    'flags': 0,
-                    'mobile_network_type': 'unknown',
-                    'nonce': calculate_nonce(),
-                    'tts': False
-                }
 
                 response = await self.session.post(
                     url,
@@ -83,6 +112,9 @@ class DiscordClient:
 
                 if response.status_code == 200:
                     logger.success(self.account_idx, f'Message "{message}" sent successfully.')
+                    random_sleep = random.randint(self.delay_between_messages[0], self.delay_between_messages[1])
+                    logger.info(self.account_idx, f'Sleeping for {random_sleep} before next message...')
+                    await asyncio.sleep(random_sleep)
                 else:
                     raise Exception(response.text)
 
@@ -90,11 +122,3 @@ class DiscordClient:
                 random_sleep = random.randint(self.delay_between_actions[0], self.delay_between_actions[1])
                 logger.error(self.account_idx, f'Error while sending message: {e}. Retrying in {random_sleep} seconds...')
                 await asyncio.sleep(random_sleep)
-
-
-    async def reply_message(self, message):
-        pass
-
-
-    async def request_to_openai(self):
-        pass

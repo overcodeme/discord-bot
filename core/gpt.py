@@ -5,7 +5,7 @@ from utils.logger import logger
 from colorama import Fore, Style
 
 
-def get_openai_response(account_idx, system_prompt, prompt=None, replying_message=None):
+def get_openai_response(account_idx, system_prompt, prompt):
     http_client = httpx.Client(proxy=PROXY_FOR_GPT_ASKING) 
     openai_client = openai.OpenAI(api_key=OPENAI_KEY, http_client=http_client)
 
@@ -14,7 +14,7 @@ def get_openai_response(account_idx, system_prompt, prompt=None, replying_messag
             model='gpt-4o',
             messages = [
                 {'role': 'system', 'content': system_prompt},
-                {'role': 'user', 'content': replying_message if replying_message else prompt}
+                {'role': 'user', 'content': prompt}
             ]
         )
         response_text = response.choices[0].message.content
