@@ -7,17 +7,17 @@ from colorama import Fore, Style
 
 def get_openai_response(account_idx, system_prompt, prompt=None, replying_message=None):
     http_client = httpx.Client(proxy=PROXY_FOR_GPT_ASKING) 
-    openai_client = openai.OpenAI(OPENAI_KEY, http_client=http_client)
+    openai_client = openai.OpenAI(api_key=OPENAI_KEY, http_client=http_client)
 
     try:
-        response = openai_client.completions.create(
+        response = openai_client.chat.completions.create(
             model='gpt-4o',
             messages = [
                 {'role': 'system', 'content': system_prompt},
                 {'role': 'user', 'content': replying_message if replying_message else prompt}
             ]
         )
-        response_text = response['choices'][0]['message']['content']
+        response_text = response.choices[0].message.content
 
         if 'Rate limit reached' in response_text:
             raise Exception('GPT rate limit reached, please try again later.')
