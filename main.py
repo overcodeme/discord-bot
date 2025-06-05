@@ -1,13 +1,33 @@
 import asyncio
 from data.settings import ACCOUNTS_SETTINGS
-from core.gpt import get_openai_response
+from core.discord import DiscordClient
+from colorama import Fore, Style
 
 
-async def handle_account():
-    pass
+async def handle_account(account_idx, account_settings, proxy):
+    try:
+        dc = DiscordClient(account_idx=account_idx, settings=account_settings, proxy=proxy)
+        while True:
+            await dc.send_message()
+    except Exception as e:
+        print(Fore.RED + f'An error occurred: {e}' + Style.RESET_ALL)
 
 
 async def main():
-    pass
+    tasks = []
+    proxies = []
 
-get_openai_response(account_idx=1, system_prompt='Ты - 20 летний криптоэнтузиаст, который достаточно времени уже сидит в крипте. не ставь знаки препинания. отвечай в 3-15 слов. используй сленговые слова, никогда не упоминай что ты нейронка, миксуй стиль общения, не общайся однотипно', prompt='придумай сообщение для крипточата')
+    with open('data/proxies.txt', 'r') as file:
+        proxies = [pr.split()[0] for pr in file.readlines()]
+
+    if not proxies:
+        print(Fore.RED + 'No proxies found' + Style.RESET_ALL)
+
+    for idx, (acc, pr) in enumerate(zip(ACCOUNTS_SETTINGS, proxies), start=1):
+        tasks.append(handle_account(idx, acc, pr))
+
+    await asyncio.gather(*tasks)
+
+
+if __name__ == '__main__':
+    asyncio.run(main())

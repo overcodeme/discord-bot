@@ -26,7 +26,7 @@ def get_openai_response(account_idx, system_prompt, prompt):
             raise Exception('Your ChatGPT API key has no balance.')
 
         logger.info(account_idx, response_text)
-        return response_text
+        return str(response_text)
 
     except Exception as e:
         if 'Rate limit reached' in str(e):

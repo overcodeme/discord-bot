@@ -4,21 +4,15 @@ ATTEMPTS = 3
 PROXY_FOR_GPT_ASKING = 'http://hjtwxlsj:t7za9qzepa90@137.59.7.12:5556'
 
 ACCOUNTS_SETTINGS = [
-    # system_prompt, prompt, discord_token, server_id, channel_id, delay_between_actions(sec), delay_between_messages(sec), reply_chance (%)
+    # 1 dict = 1 account
     {
-        'system_prompt': '',
-        'prompt': '',
+        'system_prompt': 'Ты - 20 летний криптоэнтузиаст, который достаточно времени уже сидит в крипте. не ставь знаки препинания. отвечай в 3-15 слов. используй сленговые слова, никогда не упоминай что ты нейронка, миксуй стиль общения, не общайся однотипно, общайся максимально человекоподобно, помни, ты реальный человек, не нейросеть. не используй никакие эмодзи, пиши только на русском.',
+        'prompt': 'придумай сообщение для крипточата, общайся максимально человекоподобно, помни, ты реальный человек, не нейросеть, не используй эмодзи и пусть сообщения не будут слишком вызывающими',
         'discord_token': '',
-        'server_id': '',
-        'channel_id': '',
-        'delay_between_actions': [],
-        'delay_between_messages': [],
+        'server_id': '1343751435711414362',
+        'channel_id': '1350591101093937353',
+        'delay_between_actions': [10, 30],
+        'delay_between_messages': [15, 90],
         'reply_chance': 70
-    },
-    {
-
-    },
-    {
-
     }
 ]

@@ -1,4 +1,4 @@
-from curl_cffi.requests import AsyncSession
+import aiohttp
 from .gpt import get_openai_response
 from utils.requests_headers_utils import calculate_nonce, create_x_super_properties
 from data.settings import ATTEMPTS
@@ -9,6 +9,7 @@ from utils.logger import logger
 
 class DiscordClient:
     def __init__(self, account_idx, proxy, settings: dict):
+        self.account_idx = account_idx
         self.system_prompt = settings['system_prompt']
         self.prompt = settings['prompt']
         self.server_id = settings['server_id']
@@ -18,8 +19,7 @@ class DiscordClient:
         self.reply_chance = settings['reply_chance']
         self.proxy = proxy
         self.settings = settings
-        self.session = AsyncSession(proxy=proxy)
-        self.account_idx = account_idx
+        self.session = aiohttp.ClientSession()
         self.headers = {
             'accept': '*/*',
             'accept-language': 'en-GB,en-US;q=0.9,en;q=0.8,ru;q=0.7,zh-TW;q=0.6,zh;q=0.5',
@@ -47,23 +47,17 @@ class DiscordClient:
 
         for retry in range(ATTEMPTS):
             try:
-                response = await self.session.get(
-                    url,
-                    headers=self.headers
-                )
-
-                if response.status_code == 200:
-                    logger.success(self.account_idx, 'Successfully got channel messages')
-                    data = await response.json()
-                    return data
-                else:
-                    raise Exception(response.text)
-
+                async with self.session.get(url=url, headers=self.headers, proxy=self.proxy) as response:
+                    if response.status == 200:
+                        logger.success(self.account_idx, 'Successfully got channel messages')
+                        data = await response.json()
+                        return data
+                    else:
+                        raise Exception(response.text)
             except Exception as e:
                 random_sleep = random.randint(self.delay_between_actions[0], self.delay_between_actions[1])
                 logger.error(self.account_idx, f'Error while getting channel messages: {e}. Retrying in {random_sleep} sec...')
                 await asyncio.sleep(random_sleep)
-                return data
 
 
     async def send_message(self):
@@ -75,7 +69,7 @@ class DiscordClient:
             channel_messages = await self.get_channel_messages()
             random_message = channel_messages[random.randint(0, 49)]
             prompt, message_id = random_message['content'], random_message['id']
-            message = await get_openai_response(self.account_idx, system_prompt=self.system_prompt, prompt=prompt)
+            message = get_openai_response(self.account_idx, system_prompt=self.system_prompt, prompt=prompt)
 
             data = {
                 'content': message,
@@ -91,7 +85,7 @@ class DiscordClient:
             }
 
         else:
-            message = await get_openai_response(account_idx=self.account_idx, system_prompt=self.system_prompt, prompt=self.prompt)
+            message = get_openai_response(account_idx=self.account_idx, system_prompt=self.system_prompt, prompt=self.prompt)
             data = {
                 'content': message,
                 'flags': 0,
@@ -104,19 +98,16 @@ class DiscordClient:
             try:
                 url = f'https://discord.com/api/v9/channels/{self.channel_id}/messages'
 
-                response = await self.session.post(
-                    url,
-                    headers=self.headers,
-                    json=data
-                )
+                print(type(self.proxy))
 
-                if response.status_code == 200:
-                    logger.success(self.account_idx, f'Message "{message}" sent successfully.')
-                    random_sleep = random.randint(self.delay_between_messages[0], self.delay_between_messages[1])
-                    logger.info(self.account_idx, f'Sleeping for {random_sleep} before next message...')
-                    await asyncio.sleep(random_sleep)
-                else:
-                    raise Exception(response.text)
+                async with self.session.post(url=url, headers=self.headers, json=data, proxy=self.proxy) as response:
+                    if response.status == 200:
+                        logger.success(self.account_idx, f'Message "{message}" sent successfully.')
+                        random_sleep = random.randint(self.delay_between_messages[0], self.delay_between_messages[1])
+                        logger.info(self.account_idx, f'Sleeping for {random_sleep} before next message...')
+                        await asyncio.sleep(random_sleep)
+                    else:
+                        raise Exception(response.text)
 
             except Exception as e:
                 random_sleep = random.randint(self.delay_between_actions[0], self.delay_between_actions[1])
