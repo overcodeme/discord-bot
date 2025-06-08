@@ -1,8 +1,12 @@
 import asyncio
+import logging
 from data.settings import ACCOUNTS_SETTINGS
 from core.discord import DiscordClient
 from colorama import Fore, Style
+import os
 
+
+logging.getLogger('asyncio').setLevel(logging.ERROR)
 
 async def handle_account(account_idx, account_settings, proxy):
     try:
@@ -14,6 +18,7 @@ async def handle_account(account_idx, account_settings, proxy):
 
 
 async def main():
+    os.system('cls')
     tasks = []
     proxies = []
 

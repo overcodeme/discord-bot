@@ -1,11 +1,10 @@
 import openai
 from data.settings import OPENAI_KEY, PROXY_FOR_GPT_ASKING
 import httpx
-from utils.logger import logger
 from colorama import Fore, Style
 
 
-def get_openai_response(account_idx, system_prompt, prompt):
+def get_openai_response(system_prompt, prompt):
     http_client = httpx.Client(proxy=PROXY_FOR_GPT_ASKING) 
     openai_client = openai.OpenAI(api_key=OPENAI_KEY, http_client=http_client)
 
@@ -25,7 +24,6 @@ def get_openai_response(account_idx, system_prompt, prompt):
         if 'You exceeded your current quota' in response_text:
             raise Exception('Your ChatGPT API key has no balance.')
 
-        logger.info(account_idx, response_text)
         return str(response_text)
 
     except Exception as e:

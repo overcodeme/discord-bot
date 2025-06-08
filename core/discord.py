@@ -5,11 +5,15 @@ from data.settings import ATTEMPTS
 import random
 import asyncio
 from utils.logger import logger
+import logging
 
+
+logging.getLogger('asyncio').setLevel(logging.ERROR)
 
 class DiscordClient:
     def __init__(self, account_idx, proxy, settings: dict):
         self.account_idx = account_idx
+        self.proxy = proxy
         self.system_prompt = settings['system_prompt']
         self.prompt = settings['prompt']
         self.server_id = settings['server_id']
@@ -17,7 +21,6 @@ class DiscordClient:
         self.delay_between_actions = settings['delay_between_actions']
         self.delay_between_messages = settings['delay_between_messages']
         self.reply_chance = settings['reply_chance']
-        self.proxy = proxy
         self.settings = settings
         self.session = aiohttp.ClientSession()
         self.headers = {
@@ -49,67 +52,79 @@ class DiscordClient:
             try:
                 async with self.session.get(url=url, headers=self.headers, proxy=self.proxy) as response:
                     if response.status == 200:
-                        logger.success(self.account_idx, 'Successfully got channel messages')
                         data = await response.json()
                         return data
                     else:
-                        raise Exception(response.text)
+                        data = await response.text()
+                        random_sleep = random.randint(self.delay_between_actions[0], self.delay_between_actions[1])
+                        logger.error(self.account_idx, f'Error while getting channel messages: {data}. Retrying in {random_sleep} sec...')
+                        await asyncio.sleep(random_sleep)
+
+            except aiohttp.ClientConnectionError:
+                pass
+
             except Exception as e:
                 random_sleep = random.randint(self.delay_between_actions[0], self.delay_between_actions[1])
-                logger.error(self.account_idx, f'Error while getting channel messages: {e}. Retrying in {random_sleep} sec...')
+                logger.error(self.account_idx, f'An error occurred: {e}. Retrying in {random_sleep} sec...')
                 await asyncio.sleep(random_sleep)
 
 
     async def send_message(self):
-        is_reply = (random.random() * 100) >= self.reply_chance
+        is_reply = random.randint(1, 100) <= self.reply_chance
         message = ''
+        prompt = None
         data = {}
-
-        if is_reply:
-            channel_messages = await self.get_channel_messages()
-            random_message = channel_messages[random.randint(0, 49)]
-            prompt, message_id = random_message['content'], random_message['id']
-            message = get_openai_response(self.account_idx, system_prompt=self.system_prompt, prompt=prompt)
-
-            data = {
-                'content': message,
-                'flags': 0,
-                'message_reference': {
-                    'channel_id': self.channel_id,
-                    'guild_id': self.server_id,
-                    'message_id': message_id
-                },
-                'mobile_network_type': 'unknown',
-                'nonce': calculate_nonce(),
-                'tts': False
-            }
-
-        else:
-            message = get_openai_response(account_idx=self.account_idx, system_prompt=self.system_prompt, prompt=self.prompt)
-            data = {
-                'content': message,
-                'flags': 0,
-                'mobile_network_type': 'unknown',
-                'nonce': calculate_nonce(),
-                'tts': False
-            }
 
         for retry in range(ATTEMPTS):
             try:
-                url = f'https://discord.com/api/v9/channels/{self.channel_id}/messages'
+                if is_reply:
+                    channel_messages = await self.get_channel_messages()
+                    random_message = random.choice(channel_messages)
+                    prompt, message_id = random_message['content'], random_message['id']
+                    message = get_openai_response(system_prompt=self.system_prompt, prompt=prompt)
 
-                print(type(self.proxy))
+                    data = {
+                        'content': message,
+                        'flags': 0,
+                        'message_reference': {
+                            'channel_id': self.channel_id,
+                            'guild_id': self.server_id,
+                            'message_id': message_id
+                        },
+                        'mobile_network_type': 'unknown',
+                        'nonce': calculate_nonce(),
+                        'tts': False
+                    }
+
+                else:
+                    message = get_openai_response(system_prompt=self.system_prompt, prompt=self.prompt)
+                    data = {
+                        'content': message,
+                        'flags': 0,
+                        'mobile_network_type': 'unknown',
+                        'nonce': calculate_nonce(),
+                        'tts': False
+                    }
+
+                url = f'https://discord.com/api/v9/channels/{self.channel_id}/messages'
 
                 async with self.session.post(url=url, headers=self.headers, json=data, proxy=self.proxy) as response:
                     if response.status == 200:
-                        logger.success(self.account_idx, f'Message "{message}" sent successfully.')
+                        logger.success(self.account_idx, f'{f'Question: {prompt}' if prompt else None} Answer: "{message}" sent successfully.')
                         random_sleep = random.randint(self.delay_between_messages[0], self.delay_between_messages[1])
-                        logger.info(self.account_idx, f'Sleeping for {random_sleep} before next message...')
+                        logger.info(self.account_idx, f'Sleeping for {random_sleep} sec before next message...')
                         await asyncio.sleep(random_sleep)
+                        return
                     else:
-                        raise Exception(response.text)
+                        data = await response.json()
+                        random_sleep = random.randint(self.delay_between_actions[0], self.delay_between_actions[1])
+                        logger.error(self.account_idx, f'Error while sending message: {data}. Retrying in {random_sleep} seconds...')
+                        await asyncio.sleep(random_sleep)
+            
+            except aiohttp.ClientConnectionError:
+                pass
 
             except Exception as e:
                 random_sleep = random.randint(self.delay_between_actions[0], self.delay_between_actions[1])
-                logger.error(self.account_idx, f'Error while sending message: {e}. Retrying in {random_sleep} seconds...')
+                logger.error(self.account_idx, f'An error occurred: {e}. Retrying in {random_sleep} seconds...')
                 await asyncio.sleep(random_sleep)
